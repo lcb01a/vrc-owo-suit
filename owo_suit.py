@@ -11,7 +11,7 @@ import os
 dll_path = os.path.abspath(os.path.join(os.path.dirname(__file__), './owo/OWO.dll'))
 from System.Reflection import Assembly
 Assembly.UnsafeLoadFrom(dll_path)
-from OWOGame import OWO, SensationsFactory, Muscle, ConnectionState
+from OWOGame import OWO, SensationsFactory, SensationWithMuscles, Muscle, ConnectionState
 
 class OWOSuit:
     def __init__(self, config: Config, gui: Gui):
@@ -46,29 +46,38 @@ class OWOSuit:
             self.gui.print_terminal(
                 "Interactions Continued.")
 
-    def create_sensation(self, parameter: str):
-        frequency = self.config.get_by_key("frequency") or 50
+    def setup_muscle(self, muscle: Muscle, parameter: str) -> Muscle:
         intensities = self.config.get_by_key("intensities")
         intensity = intensities.get(parameter)
-        return SensationsFactory.Create(
-            frequency, .3, intensity, 0, 0, 0)
+        return muscle.WithIntensity(intensity)
 
     def watch(self) -> None:
         while True:
             try:
                 if self.has_connected_already:
                     if len(self.active_muscles) > 0 and not self.is_paused:
+                        muscles = []
+                        frequency = self.config.get_by_key("frequency") or 50
+                        sensation = SensationsFactory.Create(
+                            frequency,
+                            0.2, # durationSeconds
+                            100,   # intensityPercentage
+                            0,   # rampUpMillis
+                            0,   # rampDownMillis
+                            0    # exitDelaySeconds
+                        )
                         for muscle in self.active_muscles:
                             parameter = self.muscles_to_parameters.get(muscle)
                             self.gui.handle_active_muscle_update(
                                 parameter=parameter)
-                            sensation = self.create_sensation(parameter)
-                            OWO.Send(sensation, muscle)
+                            muscles.append(self.setup_muscle(muscle, parameter))
+                        sensation = SensationWithMuscles(sensation, muscles)
+                        OWO.Send(sensation)
                     if len(self.active_muscles) == 0:
                         self.gui.handle_active_muscle_reset()
             except RuntimeError:  # race condition for set changing during iteration
                 pass
-            time.sleep(.3)
+            time.sleep(.1)
 
     def on_collission_enter(self, address: str, *args) -> None:
         if address not in self.osc_parameters:
