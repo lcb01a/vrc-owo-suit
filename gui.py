@@ -9,6 +9,7 @@ from enum import Enum, auto
 class Element(Enum):
     IP_ADDRESS_INPUT = auto()
     DETECT_IP_ADDRESS_CHECKBOX = auto()
+    USE_OSCQUERY_CHECKBOX = auto()
     SERVER_PORT_NUMBER_INPUT = auto()
     FREQUENCY_SETTING_SLIDER = auto()
     LEFT_PECTORAL_SETTING_SLIDER = auto()
@@ -44,6 +45,7 @@ class Gui:
         self.elements = {
             Element.IP_ADDRESS_INPUT: None,
             Element.DETECT_IP_ADDRESS_CHECKBOX: None,
+            Element.USE_OSCQUERY_CHECKBOX: None,
             Element.SERVER_PORT_NUMBER_INPUT: None,
             Element.FREQUENCY_SETTING_SLIDER: None,
             Element.LEFT_PECTORAL_SETTING_SLIDER: None,
@@ -65,6 +67,7 @@ class Gui:
             Element.CONTRIBUTE_BUTTON: None,
         }
         self.element_to_config_key = {
+            Element.USE_OSCQUERY_CHECKBOX: "use_oscquery",
             Element.SERVER_PORT_NUMBER_INPUT: "server_port",
             Element.IP_ADDRESS_INPUT: "owo_ip",
             Element.DETECT_IP_ADDRESS_CHECKBOX: "should_detect_ip",
@@ -210,6 +213,11 @@ class Gui:
         self.elements[Element.SERVER_PORT_NUMBER_INPUT] = dpg.add_input_int(default_value=server_port,
                                                                             width=-1, callback=self.handle_input_change)
 
+    def create_use_oscquery_checkbox(self):
+        use_oscquery = self.config.get_by_key("use_oscquery")
+        self.elements[Element.USE_OSCQUERY_CHECKBOX] = dpg.add_checkbox(
+            label="Use OSCQuery", default_value=use_oscquery, callback=self.handle_input_change)
+
     def create_frequency_slider(self):
         frequency = self.config.get_by_key("frequency")
         dpg.add_text("Frequency Settings")
@@ -286,6 +294,7 @@ class Gui:
             self.create_detect_address_checkbox()
             dpg.add_spacer(height=20)
             self.create_server_port_input()
+            self.create_use_oscquery_checkbox()
             dpg.add_spacer(height=20)
             self.create_frequency_slider()
             dpg.add_spacer(height=20)

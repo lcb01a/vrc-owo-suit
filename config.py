@@ -3,11 +3,23 @@ import params
 import os
 import json
 
+def merge_dicts(dict1, dict2):
+    """ Recursively merges dict2 into dict1 """
+    if not isinstance(dict1, dict) or not isinstance(dict2, dict):
+        return dict2
+    for k in dict2:
+        if k in dict1:
+            dict1[k] = merge_dicts(dict1[k], dict2[k])
+        else:
+            dict1[k] = dict2[k]
+    return dict1
+
 
 class Config:
     def __init__(self):
         self.APP_NAME = 'VRChatOWOSuit'
         self.default_config = {
+            "use_oscquery": True,
             "server_port": 9001,
             "owo_ip": "",
             "should_detect_ip": True,
@@ -43,6 +55,7 @@ class Config:
         if os.path.exists(config_path):
             with open(config_path, 'r') as file:
                 data = json.load(file)
+                data = merge_dicts(self.default_config, data)
                 return data
         else:
             with open(config_path, 'w') as file:

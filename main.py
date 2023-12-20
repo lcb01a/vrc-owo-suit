@@ -2,11 +2,19 @@ import asyncio
 import threading
 from pythonosc.dispatcher import Dispatcher
 from pythonosc.osc_server import ThreadingOSCUDPServer
+from tinyoscquery.queryservice import OSCQueryService
+from tinyoscquery.utility import get_open_tcp_port, get_open_udp_port
 from owo_suit import OWOSuit
 from config import Config
 from gui import Gui
 import os
 
+
+def start_oscquery(server_udp_port, server_tcp_port):
+    def start_server():
+        oscquery_server = OSCQueryService("VRC OWO Suit", server_tcp_port, server_udp_port)
+        oscquery_server.advertise_endpoint("/avatar")
+    return start_server
 
 gui = None
 try:
@@ -21,10 +29,16 @@ try:
     dispatcher = Dispatcher()
     owo_suit.map_parameters(dispatcher)
 
-    server_port = cfg.get_by_key("server_port")
+    server_udp_port = cfg.get_by_key("server_port")
+
+    if cfg.get_by_key("use_oscquery"):
+        server_udp_port = get_open_udp_port()
+        server_tcp_port = get_open_tcp_port()
+        threading.Thread(target=start_oscquery(server_udp_port, server_tcp_port),
+                         daemon=True).start()
 
     osc_server = ThreadingOSCUDPServer(
-        ("127.0.0.1", server_port), dispatcher, asyncio.new_event_loop())
+        ("127.0.0.1", server_udp_port), dispatcher, asyncio.new_event_loop())
     threading.Thread(target=lambda: osc_server.serve_forever(2),
                      daemon=True).start()
     threading.Thread(target=owo_suit.watch,
