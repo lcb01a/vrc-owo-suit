@@ -120,7 +120,13 @@ class OWOSuit:
             if was_entered:
                 self.active_muscles.add(muscle)
                 if address in self.impact_param:
-                    speed = self.distance_parameters[self.impact_param[address]][2]
+                    _prev, timestamp, speed = self.distance_parameters[self.impact_param[address]]
+
+                    # Discard old values
+                    if time.time() > timestamp + 1:
+                        self.distance_parameters[self.impact_param[address]] = (0,0,0)
+                        return
+
                     max_intensity = 100
                     min_intensity = 10
                     min_speed = 0
