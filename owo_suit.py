@@ -30,6 +30,21 @@ class OWOSuit:
             params.owo_suit_Lumbar_R: Muscle.Lumbar_R,
             params.owo_suit_Lumbar_L: Muscle.Lumbar_L,
         }
+        self.distance_parameters: dict[str, tuple[float, float, float]] = {
+            params.owo_suit_Abdominal_R_distance: (1, 0, 0),
+            params.owo_suit_Abdominal_L_distance: (1, 0, 0),
+            params.owo_suit_Dorsal_R_distance: (1, 0, 0),
+            params.owo_suit_Dorsal_L_distance: (1, 0, 0),
+        }
+        self.impact_param = {
+            params.owo_suit_Abdominal_R: params.owo_suit_Abdominal_R_distance,
+            params.owo_suit_Abdominal_L: params.owo_suit_Abdominal_L_distance,
+            params.owo_suit_Dorsal_R: params.owo_suit_Dorsal_R_distance,
+            params.owo_suit_Dorsal_L: params.owo_suit_Dorsal_L_distance,
+        }
+        # start, duration, muscles
+        self.active_hit: None | tuple[float, float, list[Muscle]] = None
+        self.queued_sensation: None | SensationWithMuscles = None
         self.muscles_to_parameters: dict[Muscle, str] = {
             value: key for key, value in self.osc_parameters.items()}
         self.has_connected_already = False
@@ -55,13 +70,28 @@ class OWOSuit:
         while True:
             try:
                 if self.has_connected_already:
+                    self.gui.handle_active_muscle_reset()
+
+                    # if self.queued_sensation:
+                    #     OWO.Send(self.queued_sensation)
+                    #     self.queued_sensation = None
+                    #     time.sleep(.05)
+                    #     continue
+
+                    if self.active_hit:
+                        if ((self.active_hit[0] + self.active_hit[1]) < time.time()):
+                            self.active_hit = None
+                        else:
+                            time.sleep(.05)
+                            continue
+
                     if len(self.active_muscles) > 0 and not self.is_paused:
                         muscles = []
                         frequency = self.config.get_by_key("frequency") or 50
                         sensation = SensationsFactory.Create(
                             frequency,
-                            0.2, # durationSeconds
-                            100,   # intensityPercentage
+                            0.1, # durationSeconds
+                            100, # intensityPercentage
                             0,   # rampUpMillis
                             0,   # rampDownMillis
                             0    # exitDelaySeconds
@@ -72,26 +102,66 @@ class OWOSuit:
                                 parameter=parameter)
                             muscles.append(self.setup_muscle(muscle, parameter))
                         sensation = SensationWithMuscles(sensation, muscles)
-                        OWO.Send(sensation)
-                    if len(self.active_muscles) == 0:
-                        self.gui.handle_active_muscle_reset()
+                        if len(muscles) > 0:
+                            OWO.Send(sensation)
+
             except RuntimeError:  # race condition for set changing during iteration
                 pass
-            time.sleep(.1)
+            time.sleep(.05)
 
     def on_collission_enter(self, address: str, *args) -> None:
-        if address not in self.osc_parameters:
-            return
-        if len(args) != 1:
-            return
-        was_entered: bool = args[0]
-        if type(was_entered) != bool:
-            return
-        muscle = self.osc_parameters.get(address)
-        if was_entered:
-            self.active_muscles.add(muscle)
-        else:
-            self.active_muscles.discard(muscle)
+        if address in self.osc_parameters:
+            if len(args) != 1:
+                return
+            was_entered: bool = args[0]
+            if type(was_entered) != bool:
+                return
+            muscle = self.osc_parameters.get(address)
+            if was_entered:
+                self.active_muscles.add(muscle)
+                if address in self.impact_param:
+                    speed = self.distance_parameters[self.impact_param[address]][2]
+                    max_intensity = 100
+                    min_intensity = 10
+                    min_speed = 0
+                    max_speed = 10
+
+                    intensity = int((speed-min_speed)*(min_intensity-max_intensity)/(min_speed-max_speed) + min_intensity)
+
+                    if intensity < 20:
+                        return
+
+                    if not self.active_hit:
+                        sensation = SensationsFactory.Create(80, 1, intensity, 0, 10, 0)
+                        self.active_hit = (time.time(), 1.0, [muscle])
+                        # self.queued_sensation = SensationWithMuscles(sensation, [muscle])
+                        OWO.Send(SensationWithMuscles(sensation, [muscle]))
+                    else:
+                        start, duration, muscles = self.active_hit
+                        if (start+duration/2.0) < time.time():
+                            return
+                        muscles.append(muscle)
+                        self.active_hit = (start, duration, muscles)
+                        sensation = SensationsFactory.Create(80, 1, intensity, 0, 10, 0)
+                        sensation = SensationWithMuscles(sensation, muscles)
+                        # self.queued_sensation = sensation
+                        OWO.Send(sensation)
+
+            else:
+                self.active_muscles.discard(muscle)
+        if address in self.distance_parameters:
+            if len(args) != 1:
+                return
+            last, ts, speed = self.distance_parameters[address]
+            current = args[0]
+            distance = current - last
+            now = time.time()
+            if ts == now:
+                return
+            current_speed = abs(distance/(now - ts))
+            val = (current, now, current_speed)
+            self.distance_parameters[address] = val
+
 
     def map_parameters(self, dispatcher: dispatcher.Dispatcher) -> None:
         dispatcher.set_default_handler(self.on_collission_enter)

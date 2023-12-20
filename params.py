@@ -8,3 +8,9 @@ owo_suit_Dorsal_R = "/avatar/parameters/owo_suit_Dorsal_R"
 owo_suit_Dorsal_L = "/avatar/parameters/owo_suit_Dorsal_L"
 owo_suit_Lumbar_R = "/avatar/parameters/owo_suit_Lumbar_R"
 owo_suit_Lumbar_L = "/avatar/parameters/owo_suit_Lumbar_L"
+
+owo_suit_Abdominal_R_distance = "/avatar/parameters/owo_suit_Abdominal_R_distance"
+owo_suit_Abdominal_L_distance = "/avatar/parameters/owo_suit_Abdominal_L_distance"
+
+owo_suit_Dorsal_R_distance = "/avatar/parameters/owo_suit_Dorsal_R_distance"
+owo_suit_Dorsal_L_distance = "/avatar/parameters/owo_suit_Dorsal_L_distance"
