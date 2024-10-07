@@ -47,7 +47,7 @@ jobs:
         
 
   release:
-    needs: build
+    needs: Build
     permissions:
       contents: write
     runs-on: ubuntu-latest

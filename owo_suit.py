@@ -10,6 +10,7 @@ import os
 
 dll_path = os.path.abspath(os.path.join(os.path.dirname(__file__), './owo/OWO.dll'))
 from System.Reflection import Assembly
+
 Assembly.UnsafeLoadFrom(dll_path)
 from OWOGame import OWO, SensationsFactory, SensationWithMuscles, Muscle, ConnectionState
 
@@ -18,6 +19,7 @@ class OWOSuit:
         self.config = config
         self.gui = gui
         self.active_muscles: set = set()
+        self.avatar_change = params.avatar_change
         self.osc_parameters: dict[str, Muscle] = {
             params.owo_suit_Pectoral_R: Muscle.Pectoral_R,
             params.owo_suit_Pectoral_L: Muscle.Pectoral_L,
@@ -30,21 +32,8 @@ class OWOSuit:
             params.owo_suit_Lumbar_R: Muscle.Lumbar_R,
             params.owo_suit_Lumbar_L: Muscle.Lumbar_L,
         }
-        self.distance_parameters: dict[str, tuple[float, float, float]] = {
-            params.owo_suit_Abdominal_R_distance: (1, 0, 0),
-            params.owo_suit_Abdominal_L_distance: (1, 0, 0),
-            params.owo_suit_Dorsal_R_distance: (1, 0, 0),
-            params.owo_suit_Dorsal_L_distance: (1, 0, 0),
-        }
-        self.impact_param = {
-            params.owo_suit_Abdominal_R: params.owo_suit_Abdominal_R_distance,
-            params.owo_suit_Abdominal_L: params.owo_suit_Abdominal_L_distance,
-            params.owo_suit_Dorsal_R: params.owo_suit_Dorsal_R_distance,
-            params.owo_suit_Dorsal_L: params.owo_suit_Dorsal_L_distance,
-        }
         # start, duration, muscles
         self.active_hit: None | tuple[float, float, list[Muscle]] = None
-        self.queued_sensation: None | SensationWithMuscles = None
         self.muscles_to_parameters: dict[Muscle, str] = {
             value: key for key, value in self.osc_parameters.items()}
         self.has_connected_already = False
@@ -55,6 +44,7 @@ class OWOSuit:
     def toggle_interactions(self):
         self.is_paused = not self.is_paused
         if self.is_paused:
+            self.active_muscles.clear()
             self.gui.print_terminal(
                 "Interactions Paused.")
         else:
@@ -65,19 +55,12 @@ class OWOSuit:
         intensities = self.config.get_by_key("intensities")
         intensity = intensities.get(parameter)
         return muscle.WithIntensity(intensity)
-
+    
     def watch(self) -> None:
         while True:
             try:
                 if self.has_connected_already:
                     self.gui.handle_active_muscle_reset()
-
-                    # if self.queued_sensation:
-                    #     OWO.Send(self.queued_sensation)
-                    #     self.queued_sensation = None
-                    #     time.sleep(.05)
-                    #     continue
-
                     if self.active_hit:
                         if ((self.active_hit[0] + self.active_hit[1]) < time.time()):
                             self.active_hit = None
@@ -110,6 +93,9 @@ class OWOSuit:
             time.sleep(.05)
 
     def on_collission_enter(self, address: str, *args) -> None:
+        if address == self.avatar_change:
+            self.active_muscles.clear()
+            return
         if address in self.osc_parameters:
             if len(args) != 1:
                 return
@@ -119,54 +105,8 @@ class OWOSuit:
             muscle = self.osc_parameters.get(address)
             if was_entered:
                 self.active_muscles.add(muscle)
-                if address in self.impact_param:
-                    _prev, timestamp, speed = self.distance_parameters[self.impact_param[address]]
-
-                    # Discard old values
-                    if time.time() > timestamp + 1:
-                        self.distance_parameters[self.impact_param[address]] = (0,0,0)
-                        return
-
-                    max_intensity = 100
-                    min_intensity = 10
-                    min_speed = 0
-                    max_speed = 10
-
-                    intensity = int((speed-min_speed)*(min_intensity-max_intensity)/(min_speed-max_speed) + min_intensity)
-
-                    if intensity < 20:
-                        return
-
-                    if not self.active_hit:
-                        sensation = SensationsFactory.Create(80, 1, intensity, 0, 10, 0)
-                        self.active_hit = (time.time(), 1.0, [muscle])
-                        # self.queued_sensation = SensationWithMuscles(sensation, [muscle])
-                        OWO.Send(SensationWithMuscles(sensation, [muscle]))
-                    else:
-                        start, duration, muscles = self.active_hit
-                        if (start+duration/2.0) < time.time():
-                            return
-                        muscles.append(muscle)
-                        self.active_hit = (start, duration, muscles)
-                        sensation = SensationsFactory.Create(80, 1, intensity, 0, 10, 0)
-                        sensation = SensationWithMuscles(sensation, muscles)
-                        # self.queued_sensation = sensation
-                        OWO.Send(sensation)
-
             else:
                 self.active_muscles.discard(muscle)
-        if address in self.distance_parameters:
-            if len(args) != 1:
-                return
-            last, ts, speed = self.distance_parameters[address]
-            current = args[0]
-            distance = current - last
-            now = time.time()
-            if ts == now:
-                return
-            current_speed = abs(distance/(now - ts))
-            val = (current, now, current_speed)
-            self.distance_parameters[address] = val
 
 
     def map_parameters(self, dispatcher: dispatcher.Dispatcher) -> None:
