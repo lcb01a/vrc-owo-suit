@@ -43,6 +43,8 @@ try:
                      daemon=True).start()
     threading.Thread(target=owo_suit.watch,
                      daemon=True).start()
+    threading.Thread(target=owo_suit.watchdog,
+                     daemon=True).start()
     gui.run()
 except KeyboardInterrupt:
     print("Shutting Down...\n")

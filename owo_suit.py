@@ -92,6 +92,11 @@ class OWOSuit:
                 pass
             time.sleep(.05)
 
+    def watchdog(self) -> None:
+        while True:
+            self.active_muscles.clear()
+            time.sleep(5)
+
     def on_collission_enter(self, address: str, *args) -> None:
         if address == self.avatar_change:
             self.active_muscles.clear()
